@@ -7,6 +7,7 @@ import {
   syncTransactions,
   getConnections,
   getAccountTransactions,
+  getConnectionTransactions,
 } from "../services/sync-service";
 import { getPlaidClient } from "../providers/plaid";
 
@@ -23,6 +24,12 @@ const saveConnectionSchema = z.object({
 
 const syncConnectionSchema = z.object({
   connectionId: z.string().uuid(),
+});
+
+const getTransactionsSchema = z.object({
+  connectionId: z.string().uuid(),
+  accountId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
 });
 
 // ============================================================================
@@ -83,11 +90,14 @@ sync.post(
         },
       });
     } catch (error: any) {
-      console.error("Failed to save connection:", error);
+      console.error(
+        "Failed to save connection:",
+        error instanceof Error ? error.message : error
+      );
       return c.json(
         {
           success: false,
-          error: error.message ?? "Failed to save connection",
+          error: "Failed to save connection",
         },
         500
       );
@@ -113,11 +123,14 @@ sync.post(
         data: result,
       });
     } catch (error: any) {
-      console.error("Failed to sync transactions:", error);
+      console.error(
+        "Failed to sync transactions:",
+        error instanceof Error ? error.message : error
+      );
       return c.json(
         {
           success: false,
-          error: error.message ?? "Failed to sync transactions",
+          error: "Failed to sync transactions",
         },
         500
       );
@@ -138,11 +151,43 @@ sync.get("/connections", async (c) => {
       data: connections,
     });
   } catch (error: any) {
-    console.error("Failed to get connections:", error);
+    console.error(
+      "Failed to get connections:",
+      error instanceof Error ? error.message : error
+    );
     return c.json(
       {
         success: false,
-        error: error.message ?? "Failed to get connections",
+        error: "Failed to get connections",
+      },
+      500
+    );
+  }
+});
+
+/**
+ * GET /sync/transactions
+ * Get transactions from database for a connection (optionally one account)
+ */
+sync.get("/transactions", zValidator("query", getTransactionsSchema), async (c) => {
+  const { connectionId, accountId, limit } = c.req.valid("query");
+
+  try {
+    const txns = await getConnectionTransactions({ connectionId, accountId, limit });
+
+    return c.json({
+      success: true,
+      data: txns,
+    });
+  } catch (error: any) {
+    console.error(
+      "Failed to get connection transactions:",
+      error instanceof Error ? error.message : error
+    );
+    return c.json(
+      {
+        success: false,
+        error: "Failed to get transactions",
       },
       500
     );
@@ -164,11 +209,14 @@ sync.get("/transactions/:accountId", async (c) => {
       data: txns,
     });
   } catch (error: any) {
-    console.error("Failed to get transactions:", error);
+    console.error(
+      "Failed to get transactions:",
+      error instanceof Error ? error.message : error
+    );
     return c.json(
       {
         success: false,
-        error: error.message ?? "Failed to get transactions",
+        error: "Failed to get transactions",
       },
       500
     );

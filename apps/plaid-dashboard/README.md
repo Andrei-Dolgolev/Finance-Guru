@@ -29,6 +29,7 @@ cp .env.example .env
 # PLAID_CLIENT_ID=your_client_id
 # PLAID_SECRET=your_secret
 # PLAID_ENVIRONMENT=sandbox
+# ENGINE_INTERNAL_API_KEY=long_random_shared_secret
 ```
 
 ### 3. Start Database
@@ -98,22 +99,17 @@ plaid-dashboard/
 
 ### Authentication
 - `POST /auth/plaid/link` - Create Plaid Link token
-- `POST /auth/plaid/exchange` - Exchange public token for access token
+- `POST /auth/plaid/connect` - Exchange public token, persist encrypted connection, sync initial data
 
 ### Accounts
-- `GET /accounts?accessToken=xxx` - Get accounts from Plaid
-- `GET /accounts/balance?accessToken=xxx&accountId=xxx` - Get balance
-- `GET /accounts/status?accessToken=xxx` - Check connection status
+- `GET /sync/connections` - Get saved connections with account snapshots
 
 ### Transactions
-- `GET /transactions?accessToken=xxx` - Get transactions from Plaid
-- `POST /transactions/sync` - Sync with cursor pagination
+- `GET /sync/transactions?connectionId=...&accountId=...` - Get persisted transactions
+- `POST /sync/refresh` - Refresh transactions for a connection
 
 ### Sync (Database)
-- `POST /sync/connection` - Save new connection to database
-- `POST /sync/refresh` - Refresh transactions for connection
-- `GET /sync/connections` - Get all saved connections
-- `GET /sync/transactions/:accountId` - Get transactions from DB
+- `POST /sync/connection` - Legacy internal endpoint (server-only)
 
 ## Development
 

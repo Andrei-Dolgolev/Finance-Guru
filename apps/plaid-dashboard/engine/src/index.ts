@@ -24,6 +24,10 @@ import { sync } from "./routes/sync";
 // ============================================================================
 
 const app = new Hono();
+const internalApiKey = process.env.ENGINE_INTERNAL_API_KEY;
+if (!internalApiKey && process.env.NODE_ENV === "production") {
+  throw new Error("ENGINE_INTERNAL_API_KEY is required in production");
+}
 
 // Middleware
 app.use("*", logger());
@@ -35,6 +39,33 @@ app.use(
     credentials: true,
   })
 );
+app.use("*", async (c, next) => {
+  // Keep root health endpoint public.
+  if (c.req.path === "/" || c.req.method === "OPTIONS") {
+    await next();
+    return;
+  }
+
+  if (!internalApiKey) {
+    // Backward-compatible: when key isn't configured, do not block requests.
+    // Configure ENGINE_INTERNAL_API_KEY in production.
+    await next();
+    return;
+  }
+
+  const providedKey = c.req.header("x-engine-api-key");
+  if (!providedKey || providedKey !== internalApiKey) {
+    return c.json(
+      {
+        success: false,
+        error: "Unauthorized",
+      },
+      401
+    );
+  }
+
+  await next();
+});
 
 // ============================================================================
 // Routes
@@ -61,11 +92,11 @@ app.route("/sync", sync);
 // ============================================================================
 
 app.onError((err, c) => {
-  console.error("Unhandled error:", err);
+  console.error("Unhandled error:", err instanceof Error ? err.message : err);
   return c.json(
     {
       success: false,
-      error: err.message ?? "Internal server error",
+      error: "Internal server error",
     },
     500
   );
@@ -95,6 +126,11 @@ console.log(`
 ║  Env:  ${process.env.PLAID_ENVIRONMENT ?? "sandbox"}                          ║
 ╚══════════════════════════════════════════╝
 `);
+if (!internalApiKey) {
+  console.warn(
+    "ENGINE_INTERNAL_API_KEY is not set. Configure it to restrict API access."
+  );
+}
 
 // Export for Bun's native serve
 export default {

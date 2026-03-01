@@ -55,11 +55,14 @@ transactions.get(
         data: result,
       });
     } catch (error: any) {
-      console.error("Failed to get transactions:", error);
+      console.error(
+        "Failed to get transactions:",
+        error instanceof Error ? error.message : error
+      );
       return c.json(
         {
           success: false,
-          error: error.message ?? "Failed to get transactions",
+          error: "Failed to get transactions",
         },
         500
       );
@@ -86,11 +89,14 @@ transactions.post(
         data: result,
       });
     } catch (error: any) {
-      console.error("Failed to sync transactions:", error);
+      console.error(
+        "Failed to sync transactions:",
+        error instanceof Error ? error.message : error
+      );
       return c.json(
         {
           success: false,
-          error: error.message ?? "Failed to sync transactions",
+          error: "Failed to sync transactions",
         },
         500
       );

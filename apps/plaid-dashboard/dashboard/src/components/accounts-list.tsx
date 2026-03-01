@@ -43,12 +43,12 @@ export function AccountsList({
       <ul className="divide-y divide-gray-100">
         {accounts.map((account) => (
           <li
-            key={account.accountId}
-            onClick={() => onSelectAccount?.(account.accountId)}
+            key={account.id}
+            onClick={() => onSelectAccount?.(account.id)}
             className={`
               px-4 py-3 flex items-center justify-between
               cursor-pointer hover:bg-gray-50 transition-colors
-              ${selectedAccountId === account.accountId ? "bg-blue-50" : ""}
+              ${selectedAccountId === account.id ? "bg-blue-50" : ""}
             `}
           >
             <div>

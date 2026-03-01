@@ -4,10 +4,19 @@ import { useState, useCallback, useEffect } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { createPlaidLinkToken } from "@/actions/create-plaid-link";
 import { exchangePublicToken } from "@/actions/exchange-public-token";
+import type { Account, Institution } from "@/lib/api";
 
 interface PlaidLinkButtonProps {
   userId: string;
-  onSuccess?: (accessToken: string, itemId: string, metadata: any) => void;
+  onSuccess?: (
+    connection: {
+      connectionId: string;
+      itemId: string;
+      institution: Institution;
+      accounts: Account[];
+    },
+    metadata: any
+  ) => void;
   onExit?: () => void;
   className?: string;
 }
@@ -54,7 +63,15 @@ export function PlaidLinkButton({
       const result = await exchangePublicToken(publicToken);
 
       if (result.success && result.data) {
-        onSuccess?.(result.data.accessToken, result.data.itemId, metadata);
+        onSuccess?.(
+          {
+            connectionId: result.data.connectionId,
+            itemId: result.data.itemId,
+            institution: result.data.institution,
+            accounts: result.data.accounts,
+          },
+          metadata
+        );
       } else {
         setError(result.error ?? "Failed to connect account");
       }

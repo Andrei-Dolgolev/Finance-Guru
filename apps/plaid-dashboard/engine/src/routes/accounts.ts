@@ -38,11 +38,14 @@ accounts.get("/", zValidator("query", getAccountsSchema), async (c) => {
       data: result,
     });
   } catch (error: any) {
-    console.error("Failed to get accounts:", error);
+    console.error(
+      "Failed to get accounts:",
+      error instanceof Error ? error.message : error
+    );
     return c.json(
       {
         success: false,
-        error: error.message ?? "Failed to get accounts",
+        error: "Failed to get accounts",
       },
       500
     );
@@ -65,11 +68,14 @@ accounts.get("/balance", zValidator("query", getBalanceSchema), async (c) => {
       data: result,
     });
   } catch (error: any) {
-    console.error("Failed to get balance:", error);
+    console.error(
+      "Failed to get balance:",
+      error instanceof Error ? error.message : error
+    );
     return c.json(
       {
         success: false,
-        error: error.message ?? "Failed to get balance",
+        error: "Failed to get balance",
       },
       500
     );
@@ -92,11 +98,14 @@ accounts.get("/status", zValidator("query", getAccountsSchema), async (c) => {
       data: result,
     });
   } catch (error: any) {
-    console.error("Failed to get connection status:", error);
+    console.error(
+      "Failed to get connection status:",
+      error instanceof Error ? error.message : error
+    );
     return c.json(
       {
         success: false,
-        error: error.message ?? "Failed to get connection status",
+        error: "Failed to get connection status",
       },
       500
     );

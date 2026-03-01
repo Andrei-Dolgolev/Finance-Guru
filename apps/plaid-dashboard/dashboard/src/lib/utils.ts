@@ -36,5 +36,9 @@ export function formatDate(date: string | Date): string {
  * Get engine API URL
  */
 export function getEngineUrl(): string {
-  return process.env.NEXT_PUBLIC_ENGINE_URL ?? "http://localhost:3001";
+  return (
+    process.env.ENGINE_URL ??
+    process.env.NEXT_PUBLIC_ENGINE_URL ??
+    "http://localhost:3001"
+  );
 }

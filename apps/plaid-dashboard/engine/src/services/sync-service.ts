@@ -3,13 +3,11 @@ import {
   bankConnections,
   bankAccounts,
   transactions,
-  type NewBankConnection,
   type NewBankAccount,
-  type NewTransaction,
 } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getPlaidClient } from "../providers/plaid";
-import type { TransformedTransaction } from "../providers/plaid/types";
+import { decryptToken, encryptToken } from "../security/token-crypto";
 
 // ============================================================================
 // Sync Service
@@ -29,7 +27,7 @@ export async function createConnection(params: {
   const [connection] = await db
     .insert(bankConnections)
     .values({
-      accessToken: params.accessToken,
+      accessToken: encryptToken(params.accessToken),
       itemId: params.itemId,
       institutionId: params.institutionId,
       name: params.institutionName,
@@ -95,6 +93,8 @@ export async function syncTransactions(connectionId: string): Promise<{
     throw new Error(`Connection ${connectionId} not found`);
   }
 
+  const decryptedAccessToken = decryptToken(connection.accessToken);
+
   const plaid = getPlaidClient();
   let totalAdded = 0;
   let totalUpdated = 0;
@@ -107,7 +107,7 @@ export async function syncTransactions(connectionId: string): Promise<{
     try {
       // Get transactions from Plaid
       const result = await plaid.getTransactions({
-        accessToken: connection.accessToken,
+        accessToken: decryptedAccessToken,
         accountId: account.accountId,
       });
 
@@ -155,7 +155,7 @@ export async function syncTransactions(connectionId: string): Promise<{
 
       // Update account balance
       const balance = await plaid.getAccountBalance(
-        connection.accessToken,
+        decryptedAccessToken,
         account.accountId
       );
 
@@ -168,7 +168,10 @@ export async function syncTransactions(connectionId: string): Promise<{
         })
         .where(eq(bankAccounts.id, account.id));
     } catch (error) {
-      console.error(`Failed to sync account ${account.accountId}:`, error);
+      console.error(
+        `Failed to sync account ${account.accountId}:`,
+        error instanceof Error ? error.message : error
+      );
     }
   }
 
@@ -193,8 +196,34 @@ export async function syncTransactions(connectionId: string): Promise<{
  */
 export async function getConnections() {
   return db.query.bankConnections.findMany({
+    columns: {
+      id: true,
+      institutionId: true,
+      name: true,
+      logoUrl: true,
+      status: true,
+      lastSyncedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
     with: {
-      accounts: true,
+      accounts: {
+        columns: {
+          id: true,
+          accountId: true,
+          name: true,
+          officialName: true,
+          type: true,
+          subtype: true,
+          mask: true,
+          currency: true,
+          currentBalance: true,
+          availableBalance: true,
+          enabled: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
     },
   });
 }
@@ -209,6 +238,38 @@ export async function getAccountTransactions(
   return db.query.transactions.findMany({
     where: eq(transactions.bankAccountId, accountId),
     orderBy: (transactions, { desc }) => [desc(transactions.date)],
+    limit,
+  });
+}
+
+/**
+ * Get transactions for an entire connection or one account in that connection.
+ */
+export async function getConnectionTransactions(params: {
+  connectionId: string;
+  accountId?: string;
+  limit?: number;
+}) {
+  const limit = params.limit ?? 200;
+
+  const accountRows = await db.query.bankAccounts.findMany({
+    where: params.accountId
+      ? and(
+          eq(bankAccounts.bankConnectionId, params.connectionId),
+          eq(bankAccounts.id, params.accountId)
+        )
+      : eq(bankAccounts.bankConnectionId, params.connectionId),
+    columns: { id: true },
+  });
+
+  const accountIds = accountRows.map((row) => row.id);
+  if (accountIds.length === 0) {
+    return [];
+  }
+
+  return db.query.transactions.findMany({
+    where: inArray(transactions.bankAccountId, accountIds),
+    orderBy: (tx, { desc }) => [desc(tx.date)],
     limit,
   });
 }

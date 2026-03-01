@@ -132,7 +132,10 @@ export class PlaidApiWrapper {
         institutionName = institutionResponse.data.institution.name;
         logoUrl = institutionResponse.data.institution.logo ?? null;
       } catch (error) {
-        console.warn("Could not fetch institution details:", error);
+        console.warn(
+          "Could not fetch institution details:",
+          error instanceof Error ? error.message : error
+        );
       }
     }
 

@@ -4,20 +4,21 @@ import { useState, useEffect } from "react";
 import { PlaidLinkButton } from "@/components/plaid-link-button";
 import { AccountsList } from "@/components/accounts-list";
 import {
-  getAccounts,
+  type StoredConnection,
   saveConnectionLocally,
   getStoredConnection,
   clearStoredConnection,
   type Account,
   type Institution,
 } from "@/lib/api";
+import { listConnections } from "@/actions/list-connections";
 
 // For MVP, we'll use a simple user ID
 const USER_ID = "local-user-1";
 
 export default function HomePage() {
   const [isConnected, setIsConnected] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [institution, setInstitution] = useState<Institution | null>(null);
@@ -26,50 +27,70 @@ export default function HomePage() {
 
   // Load stored connection on mount
   useEffect(() => {
-    const stored = getStoredConnection();
-    if (stored) {
-      setAccessToken(stored.accessToken);
-      setItemId(stored.itemId);
-      setAccounts(stored.accounts);
-      setInstitution(stored.institution);
-      setIsConnected(true);
+    async function initializeConnection() {
+      const stored = getStoredConnection();
+      if (stored) {
+        setConnectionId(stored.connectionId);
+        setAccounts(stored.accounts);
+        setInstitution(stored.institution);
+        setIsConnected(true);
+        setIsLoading(false);
+        return;
+      }
+
+      const connectionsResult = await listConnections();
+      if (connectionsResult.success && connectionsResult.data?.length) {
+        const first = connectionsResult.data[0];
+        const connection: StoredConnection = {
+          connectionId: first.connectionId,
+          institutionName: first.institution.name,
+          accounts: first.accounts,
+          institution: first.institution,
+          savedAt: new Date().toISOString(),
+        };
+        saveConnectionLocally(connection);
+
+        setConnectionId(first.connectionId);
+        setAccounts(first.accounts);
+        setInstitution(first.institution);
+        setIsConnected(true);
+      }
+
+      setIsLoading(false);
     }
-    setIsLoading(false);
+
+    initializeConnection();
   }, []);
 
   const handlePlaidSuccess = async (
-    token: string,
-    itemIdFromPlaid: string,
-    metadata: any
+    connection: {
+      connectionId: string;
+      itemId: string;
+      institution: Institution;
+      accounts: Account[];
+    },
+    _metadata: any
   ) => {
-    setAccessToken(token);
-    setItemId(itemIdFromPlaid);
+    setConnectionId(connection.connectionId);
+    setItemId(connection.itemId);
     setIsLoading(true);
     setError(null);
 
     try {
-      // Fetch accounts after successful connection
-      const result = await getAccounts(token);
+      setAccounts(connection.accounts);
+      setInstitution(connection.institution);
+      setIsConnected(true);
 
-      if (result.success && result.data) {
-        setAccounts(result.data.accounts);
-        setInstitution(result.data.institution);
-        setIsConnected(true);
-
-        // Save to localStorage for persistence
-        saveConnectionLocally({
-          accessToken: token,
-          itemId: itemIdFromPlaid,
-          institutionName: result.data.institution.name,
-          accounts: result.data.accounts,
-          institution: result.data.institution,
-          savedAt: new Date().toISOString(),
-        });
-      } else {
-        setError(result.error ?? "Failed to fetch accounts");
-      }
+      // Save non-sensitive connection snapshot.
+      saveConnectionLocally({
+        connectionId: connection.connectionId,
+        institutionName: connection.institution.name,
+        accounts: connection.accounts,
+        institution: connection.institution,
+        savedAt: new Date().toISOString(),
+      });
     } catch (err: any) {
-      setError(err.message ?? "Failed to fetch accounts");
+      setError(err.message ?? "Failed to save connection");
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +99,7 @@ export default function HomePage() {
   const handleDisconnect = () => {
     clearStoredConnection();
     setIsConnected(false);
-    setAccessToken(null);
+    setConnectionId(null);
     setItemId(null);
     setAccounts([]);
     setInstitution(null);
@@ -190,14 +211,14 @@ export default function HomePage() {
           </div>
 
           {/* Debug Info (for development) */}
-          {accessToken && (
+          {connectionId && (
             <details className="bg-gray-100 rounded-lg p-4">
               <summary className="cursor-pointer text-sm text-gray-600">
                 Debug: Connection Info
               </summary>
               <pre className="mt-2 text-xs overflow-x-auto">
-                Token: {accessToken.substring(0, 40)}...
-                {"\n"}Item ID: {itemId}
+                Connection ID: {connectionId}
+                {"\n"}Item ID: {itemId ?? "N/A"}
               </pre>
             </details>
           )}

@@ -1,36 +1,79 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AccountsList } from "@/components/accounts-list";
 import { PlaidLinkButton } from "@/components/plaid-link-button";
-import { getAccounts, type Account, type Institution } from "@/lib/api";
+import {
+  getStoredConnection,
+  saveConnectionLocally,
+  type Account,
+  type Institution,
+} from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
+import { listConnections } from "@/actions/list-connections";
 
 const USER_ID = "local-user-1";
 
 export default function AccountsPage() {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [institution, setInstitution] = useState<Institution | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePlaidSuccess = async (token: string) => {
-    setAccessToken(token);
+  useEffect(() => {
+    async function loadExistingConnection() {
+      const stored = getStoredConnection();
+      if (stored) {
+        setConnectionId(stored.connectionId);
+        setAccounts(stored.accounts);
+        setInstitution(stored.institution);
+        return;
+      }
+
+      const connectionsResult = await listConnections();
+      if (connectionsResult.success && connectionsResult.data?.length) {
+        const first = connectionsResult.data[0];
+        setConnectionId(first.connectionId);
+        setAccounts(first.accounts);
+        setInstitution(first.institution);
+
+        saveConnectionLocally({
+          connectionId: first.connectionId,
+          institutionName: first.institution.name,
+          accounts: first.accounts,
+          institution: first.institution,
+          savedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    loadExistingConnection();
+  }, []);
+
+  const handlePlaidSuccess = async (connection: {
+    connectionId: string;
+    itemId: string;
+    institution: Institution;
+    accounts: Account[];
+  }) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const result = await getAccounts(token);
+      setConnectionId(connection.connectionId);
+      setAccounts(connection.accounts);
+      setInstitution(connection.institution);
 
-      if (result.success && result.data) {
-        setAccounts(result.data.accounts);
-        setInstitution(result.data.institution);
-      } else {
-        setError(result.error ?? "Failed to fetch accounts");
-      }
+      saveConnectionLocally({
+        connectionId: connection.connectionId,
+        institutionName: connection.institution.name,
+        accounts: connection.accounts,
+        institution: connection.institution,
+        savedAt: new Date().toISOString(),
+      });
     } catch (err: any) {
-      setError(err.message ?? "Failed to fetch accounts");
+      setError(err.message ?? "Failed to load accounts");
     } finally {
       setIsLoading(false);
     }
@@ -43,7 +86,7 @@ export default function AccountsPage() {
   );
 
   // Not connected yet
-  if (!accessToken) {
+  if (!connectionId) {
     return (
       <div className="space-y-8">
         <div>

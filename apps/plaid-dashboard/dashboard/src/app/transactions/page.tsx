@@ -4,19 +4,19 @@ import { useState, useEffect } from "react";
 import { TransactionsTable } from "@/components/transactions-table";
 import { PlaidLinkButton } from "@/components/plaid-link-button";
 import {
-  getAccounts,
-  getTransactions,
   getStoredConnection,
   saveConnectionLocally,
   type Transaction,
   type Account,
   type Institution,
 } from "@/lib/api";
+import { listConnections } from "@/actions/list-connections";
+import { getConnectionTransactions } from "@/actions/get-connection-transactions";
 
 const USER_ID = "local-user-1";
 
 export default function TransactionsPage() {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [institution, setInstitution] = useState<Institution | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -27,30 +27,51 @@ export default function TransactionsPage() {
   const [isLoadingTx, setIsLoadingTx] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load stored connection on mount
   useEffect(() => {
-    const stored = getStoredConnection();
-    if (stored) {
-      setAccessToken(stored.accessToken);
-      setAccounts(stored.accounts);
-      setInstitution(stored.institution);
+    async function initializeConnection() {
+      const stored = getStoredConnection();
+      if (stored) {
+        setConnectionId(stored.connectionId);
+        setAccounts(stored.accounts);
+        setInstitution(stored.institution);
+        setIsLoading(false);
+        return;
+      }
+
+      const connectionsResult = await listConnections();
+      if (connectionsResult.success && connectionsResult.data?.length) {
+        const first = connectionsResult.data[0];
+        setConnectionId(first.connectionId);
+        setAccounts(first.accounts);
+        setInstitution(first.institution);
+
+        saveConnectionLocally({
+          connectionId: first.connectionId,
+          institutionName: first.institution.name,
+          accounts: first.accounts,
+          institution: first.institution,
+          savedAt: new Date().toISOString(),
+        });
+      }
+
+      setIsLoading(false);
     }
-    setIsLoading(false);
+
+    initializeConnection();
   }, []);
 
-  // Fetch transactions when access token is available
   useEffect(() => {
-    if (!accessToken) return;
+    if (!connectionId) return;
 
     async function fetchTransactions() {
       setIsLoadingTx(true);
       setError(null);
 
       try {
-        // Retry logic built into getTransactions for PRODUCT_NOT_READY
-        const result = await getTransactions({
-          accessToken: accessToken!,
+        const result = await getConnectionTransactions({
+          connectionId,
           accountId: selectedAccountId ?? undefined,
+          limit: 500,
         });
 
         if (result.success && result.data) {
@@ -66,30 +87,28 @@ export default function TransactionsPage() {
     }
 
     fetchTransactions();
-  }, [accessToken, selectedAccountId]);
+  }, [connectionId, selectedAccountId]);
 
-  const handlePlaidSuccess = async (token: string, itemId: string) => {
-    setAccessToken(token);
+  const handlePlaidSuccess = async (connection: {
+    connectionId: string;
+    itemId: string;
+    institution: Institution;
+    accounts: Account[];
+  }) => {
+    setConnectionId(connection.connectionId);
+    setAccounts(connection.accounts);
+    setInstitution(connection.institution);
+    setSelectedAccountId(null);
 
-    // Fetch accounts
-    const accountsResult = await getAccounts(token);
-    if (accountsResult.success && accountsResult.data) {
-      setAccounts(accountsResult.data.accounts);
-      setInstitution(accountsResult.data.institution);
-
-      // Save to localStorage
-      saveConnectionLocally({
-        accessToken: token,
-        itemId,
-        institutionName: accountsResult.data.institution.name,
-        accounts: accountsResult.data.accounts,
-        institution: accountsResult.data.institution,
-        savedAt: new Date().toISOString(),
-      });
-    }
+    saveConnectionLocally({
+      connectionId: connection.connectionId,
+      institutionName: connection.institution.name,
+      accounts: connection.accounts,
+      institution: connection.institution,
+      savedAt: new Date().toISOString(),
+    });
   };
 
-  // Initial loading
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -98,8 +117,7 @@ export default function TransactionsPage() {
     );
   }
 
-  // Not connected yet
-  if (!accessToken) {
+  if (!connectionId) {
     return (
       <div className="space-y-8">
         <div>
@@ -121,7 +139,6 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
@@ -131,40 +148,34 @@ export default function TransactionsPage() {
           </p>
         </div>
 
-        {/* Account Filter */}
         <select
           value={selectedAccountId ?? "all"}
           onChange={(e) =>
-            setSelectedAccountId(
-              e.target.value === "all" ? null : e.target.value
-            )
+            setSelectedAccountId(e.target.value === "all" ? null : e.target.value)
           }
           className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm"
         >
           <option value="all">All Accounts</option>
           {accounts.map((account) => (
-            <option key={account.accountId} value={account.accountId}>
+            <option key={account.id} value={account.id}>
               {account.name}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           <p>{error}</p>
-          {error.includes("not yet ready") && (
-            <p className="text-sm mt-1">
-              Plaid is still processing your data. Try refreshing in a few
-              seconds.
-            </p>
-          )}
           <button
             onClick={() => {
               setError(null);
               setIsLoadingTx(true);
-              getTransactions({ accessToken: accessToken! }).then((result) => {
+              getConnectionTransactions({
+                connectionId: connectionId!,
+                accountId: selectedAccountId ?? undefined,
+                limit: 500,
+              }).then((result) => {
                 if (result.success && result.data) {
                   setTransactions(result.data.transactions);
                 } else {
@@ -180,7 +191,6 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Transactions Table */}
       <TransactionsTable transactions={transactions} isLoading={isLoadingTx} />
     </div>
   );

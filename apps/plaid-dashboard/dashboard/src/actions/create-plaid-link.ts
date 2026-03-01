@@ -1,6 +1,6 @@
 "use server";
 
-import { getEngineUrl } from "@/lib/utils";
+import { engineRequest } from "./engine-request";
 
 interface LinkTokenResponse {
   success: boolean;
@@ -18,10 +18,8 @@ interface LinkTokenResponse {
 export async function createPlaidLinkToken(
   userId: string
 ): Promise<LinkTokenResponse> {
-  const engineUrl = getEngineUrl();
-
   try {
-    const response = await fetch(`${engineUrl}/auth/plaid/link`, {
+    const response = await engineRequest("/auth/plaid/link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),

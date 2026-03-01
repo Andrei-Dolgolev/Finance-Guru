@@ -1,27 +1,30 @@
 "use server";
 
-import { getEngineUrl } from "@/lib/utils";
+import type { Account, Institution } from "@/lib/api";
+import { engineRequest } from "./engine-request";
 
 interface ExchangeTokenResponse {
   success: boolean;
   data?: {
-    accessToken: string;
+    connectionId: string;
     itemId: string;
+    institution: Institution;
+    accounts: Account[];
+    accountsCount: number;
+    transactionsAdded: number;
   };
   error?: string;
 }
 
 /**
- * Server action to exchange a Plaid public token for an access token
- * This is called after the user completes the Plaid Link flow
+ * Server action to connect a Plaid account:
+ * exchange public token, persist server-side connection, and return safe metadata.
  */
 export async function exchangePublicToken(
   publicToken: string
 ): Promise<ExchangeTokenResponse> {
-  const engineUrl = getEngineUrl();
-
   try {
-    const response = await fetch(`${engineUrl}/auth/plaid/exchange`, {
+    const response = await engineRequest("/auth/plaid/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ publicToken }),
