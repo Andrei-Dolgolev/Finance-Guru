@@ -129,3 +129,10 @@ Plans/
 
 # Overstory (local)
 .overstory/
+
+# CLAUDE.md contains private financial data (portfolio, sanctions risk, personal details)
+# Use CLAUDE.md.template as reference for setup
+CLAUDE.md
+
+# External project symlinks (separate git repos)
+external/
