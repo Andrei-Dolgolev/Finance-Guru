@@ -136,3 +136,6 @@ CLAUDE.md
 
 # External project symlinks (separate git repos)
 external/
+
+# Local git worktrees
+.worktrees/
