@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Add project root to path for direct script execution.
 project_root = Path(__file__).parent.parent.parent
@@ -18,6 +21,23 @@ from src.integrations.trading212 import (
     Trading212Client,
     Trading212Config,
 )
+
+
+def _load_project_env() -> None:
+    """Load the repository-standard .env file without overriding shell vars."""
+    load_dotenv(project_root / ".env", override=False)
+
+
+def _resolve_output_dir(cli_output_dir: str | None) -> Path:
+    """Resolve the snapshot output directory after loading env vars."""
+    if cli_output_dir:
+        return Path(cli_output_dir)
+
+    env_output_dir = os.getenv("FIN_GURU_PORTFOLIO_DIR")
+    if env_output_dir:
+        return Path(env_output_dir)
+
+    return FinGuruConfig.PORTFOLIO_DIR
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -55,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Run the Trading 212 snapshot bridge."""
+    _load_project_env()
     args = build_parser().parse_args(argv)
     config = Trading212Config.from_env(
         environment=args.environment,
@@ -70,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    output_dir = Path(args.output_dir) if args.output_dir else FinGuruConfig.PORTFOLIO_DIR
+    output_dir = _resolve_output_dir(args.output_dir)
 
     snapshot = Trading212Adapter(Trading212Client(config)).fetch_snapshot()
     paths = LegacySnapshotWriter(output_dir).write(snapshot)

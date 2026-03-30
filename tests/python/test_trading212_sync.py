@@ -233,12 +233,87 @@ def test_sync_cli_writes_snapshots(tmp_path: Path, monkeypatch) -> None:
     assert (tmp_path / "Balances_for_Account_TRADING212.csv").exists()
 
 
+def test_sync_cli_loads_repo_root_env_file(tmp_path: Path, monkeypatch) -> None:
+    """CLI should load Trading 212 config from the repo-root .env file."""
+    from src.utils import trading212_sync_cli
+
+    snapshot = BrokerPortfolioSnapshot(
+        broker="trading212",
+        positions=[
+            SnapshotPosition(
+                instrument_code="NVDA_US_EQ",
+                ticker="NVDA",
+                name="NVIDIA",
+                quantity=1.0,
+                average_cost_basis=100.0,
+                current_price=120.0,
+                current_value=120.0,
+                unrealized_pl=20.0,
+                unrealized_pl_pct=20.0,
+                daily_pl=0.0,
+                daily_pl_pct=0.0,
+            )
+        ],
+        balances=SnapshotBalances(
+            cash_available=30.0,
+            cash_reserved=0.0,
+            total_value=150.0,
+            invested_value=120.0,
+            unrealized_pl=20.0,
+        ),
+    )
+
+    env_output_dir = tmp_path / "from-env"
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "TRADING212_API_KEY=dotenv-key",
+                "TRADING212_API_SECRET=dotenv-secret",
+                "TRADING212_ENV=demo",
+                f"FIN_GURU_PORTFOLIO_DIR={env_output_dir}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    class _FakeClient:
+        def __init__(self, config) -> None:
+            self.config = config
+
+    class _FakeAdapter:
+        def __init__(self, client) -> None:
+            self.client = client
+
+        def fetch_snapshot(self) -> BrokerPortfolioSnapshot:
+            assert self.client.config.api_key == "dotenv-key"
+            assert self.client.config.api_secret == "dotenv-secret"
+            assert self.client.config.environment == Trading212Environment.DEMO
+            return snapshot
+
+    monkeypatch.delenv("TRADING212_API_KEY", raising=False)
+    monkeypatch.delenv("TRADING212_API_SECRET", raising=False)
+    monkeypatch.delenv("TRADING212_ENV", raising=False)
+    monkeypatch.delenv("FIN_GURU_PORTFOLIO_DIR", raising=False)
+    monkeypatch.setattr(trading212_sync_cli, "project_root", tmp_path)
+    monkeypatch.setattr(trading212_sync_cli, "Trading212Client", _FakeClient)
+    monkeypatch.setattr(trading212_sync_cli, "Trading212Adapter", _FakeAdapter)
+
+    exit_code = trading212_sync_cli.main([])
+
+    assert exit_code == 0
+    assert any(path.name.startswith("Portfolio_Positions_") for path in env_output_dir.iterdir())
+    assert (env_output_dir / "Balances_for_Account_TRADING212.csv").exists()
+
+
 def test_sync_cli_requires_credentials(tmp_path: Path, capsys, monkeypatch) -> None:
     """CLI should fail fast when Trading 212 credentials are missing."""
     from src.utils import trading212_sync_cli
 
     monkeypatch.delenv("TRADING212_API_KEY", raising=False)
     monkeypatch.delenv("TRADING212_API_SECRET", raising=False)
+    monkeypatch.delenv("TRADING212_ENV", raising=False)
+    monkeypatch.delenv("FIN_GURU_PORTFOLIO_DIR", raising=False)
+    monkeypatch.setattr(trading212_sync_cli, "project_root", tmp_path)
 
     exit_code = trading212_sync_cli.main(["--output-dir", str(tmp_path)])
     captured = capsys.readouterr()
