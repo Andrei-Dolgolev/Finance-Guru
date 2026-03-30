@@ -1,20 +1,29 @@
 # SyncPortfolio Workflow
 
-**Purpose:** Import Fidelity CSV exports and sync to Google Sheets DataHub.
+**Purpose:** Import broker portfolio snapshots and sync to Google Sheets DataHub.
 
 ---
 
 ## Step 1: Pre-Flight Checks
 
 Before importing CSV:
+- [ ] If primary broker is Trading 212, run `uv run python src/utils/trading212_sync_cli.py` first
 - [ ] **Positions CSV** (`Portfolio_Positions_*.csv`) is latest by date
 - [ ] **Balances CSV** (`Balances_for_Account_*.csv`) is available and current
-- [ ] Both CSVs are from Fidelity (not M1 Finance or other broker)
+- [ ] CSVs came from either Fidelity export or the Trading 212 snapshot bridge
 - [ ] Files are in `notebooks/updates/` directory
 
 ---
 
-## Step 2: Read Latest Fidelity CSVs
+## Step 2: Read Latest Portfolio Snapshots
+
+If broker is Trading 212, hydrate the snapshots first:
+
+```bash
+uv run python src/utils/trading212_sync_cli.py
+```
+
+This writes the same legacy snapshot files used by the rest of the workflow.
 
 **Positions File**: `notebooks/updates/Portfolio_Positions_MMM-DD-YYYY.csv`
 
@@ -29,6 +38,10 @@ Before importing CSV:
 - **"Settled cash"** → SPAXX row (Column L)
 - **"Net debit"** → Pending Activity and Margin Debt
 - **"Account equity percentage"** → Margin status
+
+Snapshot source can be:
+- direct Fidelity exports, or
+- the Trading 212 bridge-generated balances snapshot
 
 ---
 
@@ -151,11 +164,11 @@ Output update summary:
 ✅ Pending Activity: ${VALUE}
 ✅ Margin debt: ${VALUE}
 ✅ No formula errors detected
-✅ Portfolio value: ${VALUE} (matches Fidelity)
+✅ Portfolio value: ${VALUE} (matches latest broker snapshot)
 ```
 
 ---
 
 ## Done
 
-Portfolio sync complete. DataHub now matches Fidelity CSV.
+Portfolio sync complete. DataHub now matches the latest broker snapshot.

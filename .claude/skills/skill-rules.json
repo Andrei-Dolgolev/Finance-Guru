@@ -6,23 +6,29 @@
             "type": "domain",
             "enforcement": "block",
             "priority": "critical",
-            "description": "Import and sync Fidelity CSV portfolio data to Google Sheets DataHub. USE WHEN user mentions import fidelity OR sync portfolio OR update positions OR CSV import OR portfolio-sync. Handles position updates, SPAXX/margin validation, safety checks, and formula protection.",
+            "description": "Import and sync broker portfolio snapshots to Google Sheets DataHub. USE WHEN user mentions import fidelity, sync portfolio, update positions, portfolio-sync, Trading 212 sync, or broker snapshot refresh. Handles Trading 212 bridge generation, position updates, SPAXX/margin validation, safety checks, and formula protection.",
             "promptTriggers": {
                 "keywords": [
                     "import fidelity",
                     "fidelity csv",
+                    "trading 212",
+                    "trading212",
+                    "t212",
                     "sync portfolio",
                     "update positions",
                     "portfolio import",
                     "csv import",
                     "portfolio sync",
                     "portfolio-sync",
+                    "sync broker",
+                    "broker snapshot",
                     "fidelity export",
                     "import csv",
                     "sync positions"
                 ],
                 "intentPatterns": [
                     "(import|update|sync|load).*?(fidelity|portfolio|positions|csv)",
+                    "(import|update|sync|load).*?(trading ?212|t212|broker|snapshot)",
                     "new.*?(fidelity csv|portfolio export)",
                     "(update|refresh).*?(portfolio|positions).*?(fidelity|csv)",
                     "(import|sync).*?(portfolio_positions|positions csv)"

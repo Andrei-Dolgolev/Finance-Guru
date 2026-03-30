@@ -101,6 +101,14 @@ describe("skill-activation-prompt hook with Bun", () => {
     expect(result.stdout).toContain("PortfolioSyncing");
   });
 
+  it("should match PortfolioSyncing for Trading 212 sync requests", async () => {
+    const result = await runHook(createTestInput("sync my trading 212 account"));
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("SKILL ACTIVATION CHECK");
+    expect(result.stdout).toContain("PortfolioSyncing");
+  });
+
   it("should group skills by priority - critical", async () => {
     const result = await runHook(createTestInput("update margin dashboard"));
 

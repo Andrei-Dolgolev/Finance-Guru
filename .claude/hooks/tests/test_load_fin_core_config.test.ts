@@ -121,6 +121,16 @@ describe("load-fin-core-config hook with Bun", () => {
     expect(result.stdout).toContain("Auto-loaded at every session start");
   });
 
+  it("should include Trading 212 sync bridge guidance in loaded context", async () => {
+    const result = await runHook({
+      session_id: "test-trading212-context",
+      event: "session_start"
+    });
+
+    expect(result.stdout).toContain("Trading 212 snapshot bridge");
+    expect(result.stdout).toContain("src/utils/trading212_sync_cli.py");
+  });
+
   it("should load system configuration", async () => {
     const result = await runHook({
       session_id: "test-config",

@@ -118,9 +118,10 @@ function generateUpdateAlert(missingBalances: boolean, missingPositions: boolean
 ${alerts.join('\n')}
 
 📥 ACTION REQUIRED:
-Please update your portfolio data by downloading the latest files from Fidelity:
-1. Balances: Export to notebooks/updates/Balances_for_Account_{account_id}.csv
-2. Positions: Export to notebooks/updates/Portfolio_Positions_MMM-DD-YYYY.csv
+Please update your portfolio data before running analysis:
+1. Trading 212: Run `uv run python src/utils/trading212_sync_cli.py`
+2. Fidelity/manual CSV flow: Export balances to notebooks/updates/Balances_for_Account_{account_id}.csv
+3. Fidelity/manual CSV flow: Export positions to notebooks/updates/Portfolio_Positions_MMM-DD-YYYY.csv
 
 Your Finance Guru analysis will be more accurate with current data.
 `;

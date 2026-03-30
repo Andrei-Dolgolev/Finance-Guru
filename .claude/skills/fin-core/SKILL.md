@@ -37,13 +37,20 @@ These files are automatically loaded into context at session start:
 
 ### 3. Portfolio Updates
 **Path**: `notebooks/updates/`
-**Contains**: Latest Fidelity account balances, positions, transaction history
+**Contains**: Latest broker snapshots for balances, positions, transaction history
 
 **File Patterns**:
 - Balances: `Balances_for_Account_{account_id}.csv` (exact match)
 - Positions: `Portfolio_Positions_MMM-DD-YYYY.csv` (e.g., `Portfolio_Positions_Nov-05-2025.csv`)
+- Trading 212 bridge: `Balances_for_Account_TRADING212.csv` plus the same positions filename pattern
 - The hook automatically finds the **latest positions file by date** in the filename
 - Files older than 7 days trigger an update alert at session start
+
+**Trading 212 Snapshot Bridge**:
+- If your primary broker is Trading 212, generate fresh snapshots before analysis with:
+  `uv run python src/utils/trading212_sync_cli.py`
+- The bridge reads `TRADING212_*` settings from the repo-root `.env`
+- The bridge writes legacy CSV snapshots into `notebooks/updates/` so existing dashboard and DataHub workflows can reuse them unchanged
 
 ### 4. System Context
 **Path**: `fin-guru/data/system-context.md`

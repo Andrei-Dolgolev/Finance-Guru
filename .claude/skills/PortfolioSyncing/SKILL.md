@@ -1,6 +1,6 @@
 ---
 name: PortfolioSyncing
-description: Import and sync broker CSV portfolio data to Google Sheets DataHub. Supports multiple brokers (Fidelity, Schwab, Vanguard, etc.). USE WHEN user mentions import broker data OR sync portfolio OR update positions OR CSV import OR portfolio-sync OR working with Portfolio_Positions CSVs. Handles position updates, SPAXX/margin validation, safety checks, and formula protection.
+description: Import and sync broker portfolio snapshots to Google Sheets DataHub. Supports Fidelity CSV exports and a Trading 212 read-only snapshot bridge that writes the same legacy files into notebooks/updates/. USE WHEN user mentions import broker data OR sync portfolio OR update positions OR CSV import OR portfolio-sync OR Trading 212 sync. Handles position updates, SPAXX/margin validation, safety checks, and formula protection.
 ---
 
 # PortfolioSyncing
@@ -11,9 +11,10 @@ Safely import broker CSV position exports into the Google Sheets DataHub tab, en
 
 **Supported Brokers**:
 - ✅ **Fidelity** - Fully automated parsing
+- ✅ **Trading 212** - Fully automated through the read-only API snapshot bridge
 - ⚠️ **Schwab, Vanguard, TD Ameritrade, E*TRADE, Robinhood** - Manual mapping required (coming soon)
 
-**Broker Detection**: Finance Guru automatically detects your broker from `user-profile.yaml` (set during onboarding). CSV parsing is tailored to your broker's format.
+**Broker Detection**: Finance Guru automatically detects your broker from `user-profile.yaml` (set during onboarding). For Trading 212, the workflow first generates legacy snapshot CSVs with the bridge CLI, then continues with the same downstream sheet sync logic.
 
 **See**: `docs/broker-csv-export-guide.md` for detailed export instructions per broker.
 
@@ -27,13 +28,14 @@ Running the **SyncPortfolio** workflow from the **PortfolioSyncing** skill...
 
 | Workflow | Trigger | File |
 |----------|---------|------|
-| **SyncPortfolio** | "sync portfolio", "portfolio-sync", "import fidelity" | `workflows/SyncPortfolio.md` |
+| **SyncPortfolio** | "sync portfolio", "portfolio-sync", "import fidelity", "sync trading 212" | `workflows/SyncPortfolio.md` |
 
 ## Examples
 
-**Example 1: Sync after downloading new Fidelity CSV**
+**Example 1: Sync Trading 212 into existing sheet workflow**
 ```
 User: "portfolio-sync"
+-> Runs `uv run python src/utils/trading212_sync_cli.py` when broker is Trading 212
 -> Reads Portfolio_Positions_*.csv and Balances_*.csv from notebooks/updates/
 -> Compares with Google Sheets DataHub
 -> Updates quantities, cost basis, SPAXX, margin debt
@@ -60,7 +62,21 @@ User: "import fidelity CSV"
 
 ## Core Workflow
 
-### 1. Read Latest Fidelity CSVs
+### 0. Hydrate Legacy Snapshots
+
+If the primary broker is **Trading 212**:
+
+```bash
+uv run python src/utils/trading212_sync_cli.py
+```
+
+- This reads `TRADING212_API_KEY`, `TRADING212_API_SECRET`, `TRADING212_ENV`, and optionally `FIN_GURU_PORTFOLIO_DIR` from the repo-root `.env`
+- The command writes `Portfolio_Positions_*.csv` and `Balances_for_Account_TRADING212.csv` into `notebooks/updates/`
+- After that, continue with the normal CSV-based workflow below
+
+If the primary broker is **Fidelity**, skip this step and use the exported CSVs directly.
+
+### 1. Read Latest Portfolio Snapshots
 
 **Positions File**: `notebooks/updates/Portfolio_Positions_MMM-DD-YYYY.csv`
 
@@ -77,6 +93,10 @@ PLTR,369.746,$188.90,$69845.01,+$60235.59,...,$25.99
 ```
 
 **Balances File**: `notebooks/updates/Balances_for_Account_{account_id}.csv`
+
+These files may come from:
+- direct Fidelity exports, or
+- the Trading 212 snapshot bridge
 
 **Key Fields to Extract for Cash & Margin**:
 - **"Settled cash"** → Use for SPAXX row (Column L: Current Value)
